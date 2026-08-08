@@ -1,11 +1,7 @@
 name: Remove auth-guard.js from HTML Files
 
 on:
-  # İş akışını manuel olarak çalıştırmak için
   workflow_dispatch:
-  # (İsteğe bağlı) Her push'ta çalışmasını isterseniz aşağıdaki satırı aktif edin:
-  # push:
-  #   branches: [ main ]
 
 jobs:
   clean-files:
@@ -16,18 +12,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. PowerShell'i yükle (Ubuntu'da varsayılan olarak gelir)
-      - name: Setup PowerShell
-        uses: actions/setup-powershell@v1
-        with:
-          pwsh-version: 'latest'
-
-      # 3. Temizleme betiğini çalıştır
+      # 2. PowerShell'i doğrudan kullan (setup-powershell kaldırıldı)
       - name: Run cleanup script
         shell: pwsh
-        run: ./remove-auth-guard.ps1
+        run: |
+          Write-Host "🚀 Auth-Guard temizleme betiği başlatıldı..."
+          
+          # Tüm .html dosyalarını bul
+          $htmlFiles = Get-ChildItem -Path . -Filter *.html -Recurse -File
+          $modifiedFiles = 0
+          
+          foreach ($file in $htmlFiles) {
+              $content = Get-Content -Path $file.FullName -Raw
+              
+              # auth-guard.js içeren script satırlarını sil
+              if ($content -match '<script[^>]*src=["'']?[^>"'']*auth-guard\.js[^>]*>.*?</script>') {
+                  Write-Host "🔄 İşleniyor: $($file.Name)"
+                  $newContent = $content -replace '<script[^>]*src=["'']?[^>"'']*auth-guard\.js[^>]*>.*?</script>', ''
+                  
+                  if ($content -ne $newContent) {
+                      Set-Content -Path $file.FullName -Value $newContent -NoNewline
+                      $modifiedFiles++
+                      Write-Host "✅ Silindi: $($file.Name)"
+                  }
+              }
+          }
+          
+          Write-Host "`n✨ Temizlik tamamlandı! $modifiedFiles dosya güncellendi."
 
-      # 4. Değişiklikleri GitHub'a geri gönder
+      # 3. Değişiklikleri GitHub'a geri gönder
       - name: Commit and push changes
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
